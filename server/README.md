@@ -1,4 +1,1 @@
-Installation:
-
-Install spacy models:
-python -m spacy download en_core_web_sm
+Whatcha lookin at mister? -> What are you looking at, sir?
