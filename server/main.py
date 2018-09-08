@@ -14,12 +14,15 @@ from nltk.corpus import wordnet as wn
 import en
 
 import spacy
-
+import gensim
 from pycorenlp import StanfordCoreNLP
 
 
+import change_voice
+
 class Paraphrase():
 	def __init__(self):
+
 		self.text = text
 		self.text = self.preprocess_text()
 		self._sentences = sent_tokenize(self.text)
@@ -31,8 +34,27 @@ class Paraphrase():
 		self.debug = 1
 		self.aggressive = False
 
+		self.gensim_w2v_model = gensim.models.KeyedVectors.load_word2vec_format('./Models/GoogleNews-vectors-negative300.bin.gz', 
+									binary=True, limit = 100000)
+
 
 		self._max_index_syn = 3
+
+	def _get_similar_phrase(self, phrase = []):
+		
+		if set(phrase).intersection(set(self.gensim_w2v_model.vocab)) == set(phrase):		
+			syns = [(syn, score) for syn,score in self.gensim_w2v_model.most_similar(positive = phrase)
+						if syn != phrase[0]]
+
+		else:
+			return ' '.join(word for word in phrase)
+
+		if syns[0][1] < 0.5 or "'" in syn:
+			return ' '.join(word for word in phrase)
+		
+		syn = syns[0][0]	
+		return str(re.sub(r'\_', ' ', syn.lower()))
+		
 
 	def _aggressive_standards(self):
 		if self.aggressive:
@@ -55,7 +77,10 @@ class Paraphrase():
 	            return (lemma, ss.name())
 
 
-	def eligible_for_replacement(self, word, pos, next_pos):
+	def eligible_for_replacement(self, word, pos, next_pos = ''):
+		if not re.search(r'[a-z]', word):
+			return False
+
 		if next_pos == 'IN':
 			return False
 
@@ -78,7 +103,7 @@ class Paraphrase():
 			return True
 
 		if pos in ('VBN', 'VBG'): 		
-			return True
+			return False
 
 		if pos in ('UH'): 		
 			return True
@@ -138,10 +163,11 @@ class Paraphrase():
 
 		return text
 
+		
+
 
 	def paraphrase(self):
 		text = self.text
-
 		alt_text = ''
 		for sentence in self._pos_tagged_words:
 			alt_sent = ''
@@ -153,69 +179,20 @@ class Paraphrase():
 					#Reached last word of the sent
 					next_pos = ''
 				if self.eligible_for_replacement(word = word, pos = pos, next_pos = next_pos):	
-					syn = self.get_replacement(word = word, pos = pos,)	
-					
+					syn = self._get_similar_phrase(phrase = [word])
+					syn = self.get_replacement(word = syn, pos = pos,)	
 				else:
 					syn = word
 				
 				alt_sent += ' ' + syn
-			
-			
+				
+
 			alt_text += ' ' + alt_sent[1].upper() + alt_sent[2:]
-			#alt_text = self._change_voice(sentence_active = alt_sent)
+			#alt_text += change_voice.change_voice(sentence_active = alt_sent, _nlp = self._nlp )
 		return self.format_text(text = alt_text)
 
-	def _change_voice(self, sentence_active):
-
-		doc = self._nlp(sentence_active)
-		
-		if not set(['nsubj', 'ROOT', 'dobj']).intersection([token.dep_ for token in doc]) == set(['nsubj', 'ROOT', 'dobj']):
-			return sentence_active
-		
-		temp_sentence = []
-
-		root_token = [(token.text, token.dep_) for token in doc if token.dep_ in  ('nsubj', 'aux', 'ROOT', 'dobj')]
-		
-		for word, dep in root_token:
-			if dep == 'dobj':
-				for item in doc.noun_chunks:
-					if re.search(word, item.text):
-						temp_sentence.append(item.text)
-						break
-
-				root_token.remove((word,dep))
-				break
-
-		for word, dep in root_token:
-			if dep == 'aux':
-				temp_sentence.append(word)
-				root_token.remove((word,dep))
-
-		temp_sentence.append(u'be')
-		for word, dep in root_token:
-			if dep == 'ROOT':
-				temp_sentence.append(word)
-				root_token.remove((word,dep))
-
-		flag = 0 
-		temp_sentence.append(u'by')
-		for word, dep in root_token:
-			if dep == 'nsubj':
-				for item in doc.noun_chunks:
-					if re.search(word, item.text):
-						temp_sentence.append(item.text)
-						break
-				root_token.remove((word,dep))
-				break
-		#print temp_sentence
-		temp_sentence2 = ' '.join(x for x in temp_sentence)
-		sentence_passive = temp_sentence2
-		print sentence_passive
-		return sentence_passive
 
 text = open('input.txt').read()
 p = Paraphrase()
 p.text = text
-#print p._pos_tagged_words
 print(p.paraphrase())
-#print(p._change_voice())
