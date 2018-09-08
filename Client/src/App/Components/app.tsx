@@ -3,6 +3,7 @@ import { Route, Switch } from 'react-router-dom';
 import { Router } from 'react-router';
 import { createBrowserHistory } from 'history';
 import paraPhraserContainer from '../../ParaPhraser/Container/paraPhraserContainer';
+import '../../Design/index.css';
 
 const history = createBrowserHistory();
 
